@@ -51,6 +51,23 @@ export async function getCardById(id: string): Promise<CardData | null> {
   return row ? toCardData(row) : null;
 }
 
+/**
+ * Server-only — fetches the original raw_story behind a card so the
+ * refine flow can regenerate without the client having to send it. Used
+ * as a fallback when the client doesn't have the story in sessionStorage
+ * (e.g. they navigated to a card from /feed).
+ */
+export async function getRawStoryById(id: string): Promise<string | null> {
+  if (!dbConfigured()) return null;
+  const db = getDb();
+  const rows = await db
+    .select({ rawStory: schema.cards.rawStory })
+    .from(schema.cards)
+    .where(eq(schema.cards.id, id))
+    .limit(1);
+  return rows[0]?.rawStory ?? null;
+}
+
 export async function listFeed(
   cursor: string | null = null,
 ): Promise<FeedPage> {

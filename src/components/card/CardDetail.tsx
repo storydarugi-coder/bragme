@@ -7,6 +7,7 @@ import { CardActions } from "./CardActions";
 import { ThemePicker } from "./ThemePicker";
 import { EmojiPicker } from "./EmojiPicker";
 import { ShareText } from "./ShareText";
+import { RefinePicker } from "./RefinePicker";
 import { PremiumCta } from "@/components/PremiumCta";
 import { loadCard, saveCard } from "@/lib/card-storage";
 import {
@@ -106,6 +107,8 @@ export function CardDetail({ data, watermark, premiumUrl }: Props) {
         <ThemePicker value={theme} onChange={setTheme} />
         <EmojiPicker value={emoji} onChange={setEmoji} />
       </section>
+
+      <RefinePicker cardId={data.id} />
 
       <div className="w-full max-w-md space-y-3">
         <CardActions

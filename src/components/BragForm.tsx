@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { mockGenerate } from "@/lib/mock";
-import { saveCard } from "@/lib/card-storage";
+import { saveCard, saveRawStory } from "@/lib/card-storage";
 
 const MAX_STORY = 2000;
 const MIN_STORY = 30;
@@ -80,8 +80,10 @@ export function BragForm() {
     }, 1100);
 
     try {
-      const card = await callGenerate(story.trim());
+      const trimmed = story.trim();
+      const card = await callGenerate(trimmed);
       saveCard(card);
+      saveRawStory(card.id, trimmed);
       router.push(`/card/${card.id}`);
     } catch (err) {
       console.error(err);

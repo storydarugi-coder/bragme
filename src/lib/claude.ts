@@ -10,6 +10,26 @@ Constraints — keep these tight, the card layout depends on them:
 - emoji: one single emoji that captures the person
 - color_theme: pick the best fit from sunset, ocean, forest, lavender, peach, or mono`;
 
+export const VIBE_MODIFIERS = ["soft", "chaotic", "confident", "cryptic"] as const;
+export type VibeModifier = (typeof VIBE_MODIFIERS)[number];
+
+const MODIFIER_PROMPTS: Record<VibeModifier, string> = {
+  soft: "For this version, lean specifically into gentleness, vulnerability, and the quiet wins. Less swagger, more warmth. Peach or lavender often fit.",
+  chaotic:
+    "For this version, crank up the maximalist chaotic-girlie energy. More delulu, more sparkle, more 'I am unwell but in a fun way'. Brag points should feel like a group-chat avalanche.",
+  confident:
+    "For this version, go bolder. Audacious 'I'm that girl' confidence. No apologies, no hedging. Sunset or ocean often fit.",
+  cryptic:
+    "For this version, keep it mysterious. Fewer adjectives, more atmosphere. Quietly powerful, slightly haunted. Mono or lavender often fit.",
+};
+
+export function isVibeModifier(value: unknown): value is VibeModifier {
+  return (
+    typeof value === "string" &&
+    (VIBE_MODIFIERS as readonly string[]).includes(value)
+  );
+}
+
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
@@ -50,13 +70,18 @@ export type GeneratedCard = {
 
 /**
  * Calls Claude with a strict-JSON system prompt + json_schema output_config.
- * Retries once on parse / validation failure.
+ * Retries once on parse / validation failure. When `modifier` is set, an
+ * extra "Refinement guidance" line is appended to the system prompt to
+ * shift the tonal register for the refine flow.
  */
-export async function generateBragCard(rawStory: string): Promise<GeneratedCard> {
+export async function generateBragCard(
+  rawStory: string,
+  modifier?: VibeModifier,
+): Promise<GeneratedCard> {
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await callOnce(rawStory);
+      return await callOnce(rawStory, modifier);
     } catch (err) {
       lastError = err;
       console.warn(`[generate] attempt ${attempt + 1} failed:`, err);
@@ -73,8 +98,15 @@ export async function generateBragCard(rawStory: string): Promise<GeneratedCard>
   throw lastError ?? new Error("Generation failed");
 }
 
-async function callOnce(rawStory: string): Promise<GeneratedCard> {
+async function callOnce(
+  rawStory: string,
+  modifier?: VibeModifier,
+): Promise<GeneratedCard> {
   const client = getClient();
+
+  const system = modifier
+    ? `${SYSTEM_PROMPT}\n\nRefinement guidance: ${MODIFIER_PROMPTS[modifier]}`
+    : SYSTEM_PROMPT;
 
   // @anthropic-ai/sdk 0.68 hasn't typed `output_config` (the GA
   // structured-outputs param) yet. The wire-level field is supported
@@ -87,7 +119,7 @@ async function callOnce(rawStory: string): Promise<GeneratedCard> {
   } = {
     model: "claude-sonnet-4-6",
     max_tokens: 600,
-    system: SYSTEM_PROMPT,
+    system,
     messages: [{ role: "user", content: rawStory }],
     output_config: {
       format: { type: "json_schema", schema: RESPONSE_SCHEMA },
