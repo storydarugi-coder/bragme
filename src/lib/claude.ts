@@ -3,12 +3,29 @@ import { COLOR_THEMES, type ColorTheme } from "@/db/schema";
 
 const SYSTEM_PROMPT = `You are a witty, warm friend who turns people's messy self-descriptions into shareable brag cards. Reframe complaints/insecurities as strengths without being saccharine. Tone: Gen-Z, slightly self-aware humor, main character energy. Respond directly without preamble.
 
+Language: detect the language of the user's story and write the entire card (title, brag_points, vibe_caption) in that same language. Use that language's contemporary youth pop-culture register — not literal translations of English Gen-Z slang. Korean → Korean Gen-Z; Japanese → gyaru/zoomer humor; Spanish → reggaetón-era irony; etc.
+
 Constraints — keep these tight, the card layout depends on them:
-- title: 5-7 words, catchy English
-- brag_points: 3-5 short bullets, each one sentence under 12 words
-- vibe_caption: 1 poetic/funny one-liner, max 15 words
+- title: 5-7 words (or equivalent length), catchy
+- brag_points: 3-5 short bullets, each one sentence under ~12 words
+- vibe_caption: 1 poetic/funny one-liner, max ~15 words
 - emoji: one single emoji that captures the person
 - color_theme: pick the best fit from sunset, ocean, forest, lavender, peach, or mono`;
+
+const TRANSLATE_SYSTEM_PROMPT_FOR = (targetLanguage: string) =>
+  `You are translating a BragMe brag card to ${targetLanguage}.
+
+Source card is given as JSON. Translate the title, brag_points, and vibe_caption to ${targetLanguage}, preserving:
+- The playful Gen-Z tone — use ${targetLanguage}'s equivalent youth pop-culture register (not literal translations of English slang)
+- The emoji from the source — exactly the same character
+- The color_theme from the source — exactly the same value
+
+Constraints unchanged:
+- title: 5-7 words equivalent in ${targetLanguage}
+- brag_points: same number as source (3-5), each one short sentence
+- vibe_caption: 1 line, equivalent of <15 English words
+
+Output the same JSON schema.`;
 
 export const VIBE_MODIFIERS = ["soft", "chaotic", "confident", "cryptic"] as const;
 export type VibeModifier = (typeof VIBE_MODIFIERS)[number];
@@ -108,6 +125,59 @@ async function callOnce(
     ? `${SYSTEM_PROMPT}\n\nRefinement guidance: ${MODIFIER_PROMPTS[modifier]}`
     : SYSTEM_PROMPT;
 
+  return callModel(client, system, rawStory);
+}
+
+/**
+ * Translate an existing card's text to another language. Preserves the
+ * emoji and color_theme verbatim — only language changes. Retries once
+ * on parse / validation failure, mirroring generateBragCard.
+ */
+export async function translateCard(
+  card: GeneratedCard,
+  targetLanguageName: string,
+): Promise<GeneratedCard> {
+  const sourcePayload = JSON.stringify({
+    title: card.title,
+    brag_points: card.bragPoints,
+    vibe_caption: card.vibeCaption,
+    emoji: card.emoji,
+    color_theme: card.colorTheme,
+  });
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const client = getClient();
+      const system = TRANSLATE_SYSTEM_PROMPT_FOR(targetLanguageName);
+      const result = await callModel(client, system, sourcePayload);
+      // Defensive: enforce emoji + color_theme didn't drift even though
+      // the prompt asks to preserve them. If Claude got creative, snap back.
+      return {
+        ...result,
+        emoji: card.emoji,
+        colorTheme: card.colorTheme,
+      };
+    } catch (err) {
+      lastError = err;
+      console.warn(`[translate] attempt ${attempt + 1} failed:`, err);
+      if (
+        err instanceof Anthropic.AuthenticationError ||
+        err instanceof Anthropic.RateLimitError ||
+        err instanceof Anthropic.PermissionDeniedError
+      ) {
+        throw err;
+      }
+    }
+  }
+  throw lastError ?? new Error("Translation failed");
+}
+
+async function callModel(
+  client: Anthropic,
+  system: string,
+  userInput: string,
+): Promise<GeneratedCard> {
   // @anthropic-ai/sdk 0.68 hasn't typed `output_config` (the GA
   // structured-outputs param) yet. The wire-level field is supported
   // by the API; we augment the request type locally so the return type
@@ -120,7 +190,7 @@ async function callOnce(
     model: "claude-sonnet-4-6",
     max_tokens: 600,
     system,
-    messages: [{ role: "user", content: rawStory }],
+    messages: [{ role: "user", content: userInput }],
     output_config: {
       format: { type: "json_schema", schema: RESPONSE_SCHEMA },
     },

@@ -9,6 +9,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { LayoutTabs, type LayoutMode } from "./LayoutTabs";
 import { ShareText } from "./ShareText";
 import { RefinePicker } from "./RefinePicker";
+import { TranslatePicker } from "./TranslatePicker";
 import { PremiumCta } from "@/components/PremiumCta";
 import { loadCard, saveCard } from "@/lib/card-storage";
 import {
@@ -118,6 +119,8 @@ export function CardDetail({ data, watermark, premiumUrl }: Props) {
       </section>
 
       <RefinePicker cardId={data.id} />
+
+      <TranslatePicker cardId={data.id} />
 
       <div className="w-full max-w-md space-y-3">
         <CardActions
