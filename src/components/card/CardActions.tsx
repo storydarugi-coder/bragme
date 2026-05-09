@@ -22,6 +22,9 @@ const VARIANT_LABEL: Record<CardVariant, string> = {
   post: "1:1",
   photocard: "Photocard",
   polaroid: "Polaroid",
+  magazine: "Magazine",
+  receipt: "Receipt",
+  notebook: "Notebook",
 };
 
 export function CardActions({ data, targetSelector, variants }: Props) {

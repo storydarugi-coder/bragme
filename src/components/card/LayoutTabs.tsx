@@ -1,6 +1,12 @@
 "use client";
 
-export type LayoutMode = "default" | "photocard" | "polaroid";
+export type LayoutMode =
+  | "default"
+  | "photocard"
+  | "polaroid"
+  | "magazine"
+  | "receipt"
+  | "notebook";
 
 type Props = {
   value: LayoutMode;
@@ -11,13 +17,16 @@ const TABS: Array<{ value: LayoutMode; label: string; sub: string }> = [
   { value: "default", label: "Default", sub: "9:16 + 1:1" },
   { value: "photocard", label: "📸 Photocard", sub: "K-pop frame" },
   { value: "polaroid", label: "🖼️ Polaroid", sub: "vintage square" },
+  { value: "magazine", label: "📰 Magazine", sub: "cover story" },
+  { value: "receipt", label: "🧾 Receipt", sub: "itemized" },
+  { value: "notebook", label: "📓 Notebook", sub: "journal page" },
 ];
 
 export function LayoutTabs({ value, onChange }: Props) {
   return (
     <nav
       aria-label="Card layout"
-      className="inline-flex flex-wrap gap-1 rounded-2xl border border-foreground/10 bg-background/60 p-1"
+      className="flex flex-wrap justify-center gap-1.5 rounded-2xl border border-foreground/10 bg-background/60 p-1.5"
     >
       {TABS.map((t) => {
         const active = value === t.value;
@@ -31,7 +40,7 @@ export function LayoutTabs({ value, onChange }: Props) {
               "flex flex-col items-start rounded-xl px-3 py-1.5 text-left transition",
               active
                 ? "bg-foreground text-background"
-                : "text-muted hover:text-foreground",
+                : "text-muted hover:bg-foreground/5 hover:text-foreground",
             ].join(" ")}
           >
             <span className="text-sm font-medium leading-tight">{t.label}</span>

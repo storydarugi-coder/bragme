@@ -29,6 +29,9 @@ const VARIANTS_BY_LAYOUT: Record<LayoutMode, CardVariant[]> = {
   default: ["story", "post"],
   photocard: ["photocard"],
   polaroid: ["polaroid"],
+  magazine: ["magazine"],
+  receipt: ["receipt"],
+  notebook: ["notebook"],
 };
 
 export function CardDetail({ data, watermark, premiumUrl }: Props) {
@@ -151,6 +154,12 @@ function labelFor(variant: CardVariant): string {
       return "photocard";
     case "polaroid":
       return "polaroid";
+    case "magazine":
+      return "magazine";
+    case "receipt":
+      return "receipt";
+    case "notebook":
+      return "notebook";
   }
 }
 
