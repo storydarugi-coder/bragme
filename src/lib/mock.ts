@@ -1,11 +1,12 @@
 import type { CardData } from "@/components/card/Card";
 import type { ColorTheme } from "@/db/schema";
 import { COLOR_THEMES } from "@/db/schema";
+import { generateHandle } from "./handle";
 
 export const MOCK_CARDS: CardData[] = [
   {
     id: "mock-1",
-    nickname: "lunatypes",
+    nickname: "quiet_kettle_42",
     title: "Quietly Carrying The Whole Crew",
     bragPoints: [
       "Group chat therapist with receipts",
@@ -20,7 +21,7 @@ export const MOCK_CARDS: CardData[] = [
   },
   {
     id: "mock-2",
-    nickname: "salt_n_swim",
+    nickname: "brisk_harbor_881",
     title: "Built Like A Plot Twist In Act Two",
     bragPoints: [
       "Three jobs, one nervous system, zero L's",
@@ -35,7 +36,7 @@ export const MOCK_CARDS: CardData[] = [
   },
   {
     id: "mock-3",
-    nickname: "fern.exe",
+    nickname: "fresh_fern_07",
     title: "Local Forest Sprite Reporting In",
     bragPoints: [
       "Names every plant on her balcony",
@@ -50,7 +51,7 @@ export const MOCK_CARDS: CardData[] = [
   },
   {
     id: "mock-4",
-    nickname: "violetcore",
+    nickname: "cosmic_oracle_19",
     title: "Delulu Is Indeed The Solulu",
     bragPoints: [
       "Manifested a job and got it",
@@ -65,7 +66,7 @@ export const MOCK_CARDS: CardData[] = [
   },
   {
     id: "mock-5",
-    nickname: "peachpitt",
+    nickname: "sweet_peach_322",
     title: "Soft On The Outside, Spreadsheet Inside",
     bragPoints: [
       "Bakes when stressed, ships when calm",
@@ -80,7 +81,7 @@ export const MOCK_CARDS: CardData[] = [
   },
   {
     id: "mock-6",
-    nickname: "mono.kid",
+    nickname: "lone_quartz_56",
     title: "Whispers Loud, Logs Off Loud",
     bragPoints: [
       "Owns four black hoodies, regrets none",
@@ -95,7 +96,7 @@ export const MOCK_CARDS: CardData[] = [
   },
   {
     id: "mock-7",
-    nickname: "honeystatic",
+    nickname: "golden_donut_91",
     title: "Built A Whole Lore From One Bad Date",
     bragPoints: [
       "Turns the chaos into a TED talk",
@@ -110,7 +111,7 @@ export const MOCK_CARDS: CardData[] = [
   },
   {
     id: "mock-8",
-    nickname: "harbour.ave",
+    nickname: "calm_atlas_77",
     title: "The Calm In Other People's Group Chats",
     bragPoints: [
       "Mediates fights with one voice memo",
@@ -163,13 +164,7 @@ const FALLBACK_VIBES = [
 const FALLBACK_EMOJIS = ["✨", "💫", "🌙", "🔥", "🪄", "🌈", "🦋"];
 
 /** Mock generator — stand-in for /api/generate during UI build. */
-export function mockGenerate({
-  nickname,
-  rawStory,
-}: {
-  nickname: string;
-  rawStory: string;
-}): CardData {
+export function mockGenerate({ rawStory }: { rawStory: string }): CardData {
   const id = `mock-${Date.now().toString(36)}-${Math.random()
     .toString(36)
     .slice(2, 6)}`;
@@ -195,7 +190,7 @@ export function mockGenerate({
 
   return {
     id,
-    nickname: nickname.trim() || "anon",
+    nickname: generateHandle(),
     title: FALLBACK_TITLES[Math.floor(Math.random() * FALLBACK_TITLES.length)],
     bragPoints,
     vibeCaption:

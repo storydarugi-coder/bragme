@@ -1,9 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Card, type CardData } from "./Card";
 import { CardActions } from "./CardActions";
+import { ThemePicker } from "./ThemePicker";
+import { EmojiPicker } from "./EmojiPicker";
 import { PremiumCta } from "@/components/PremiumCta";
+import { loadCard, saveCard } from "@/lib/card-storage";
+import type { ColorTheme } from "@/db/schema";
 
 type Props = {
   data: CardData;
@@ -12,6 +17,33 @@ type Props = {
 };
 
 export function CardDetail({ data, watermark, premiumUrl }: Props) {
+  const [theme, setTheme] = useState<ColorTheme>(data.colorTheme);
+  const [emoji, setEmoji] = useState(data.emoji);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate any prior session-stored customization for this card id.
+  useEffect(() => {
+    const stored = loadCard(data.id);
+    if (stored) {
+      setTheme(stored.colorTheme);
+      setEmoji(stored.emoji);
+    }
+    setHydrated(true);
+    // We only want this on first mount per id, not whenever the parent
+    // happens to re-render with a fresh object literal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.id]);
+
+  // Persist customization back so reloads + /card/[id] direct visits keep
+  // the user's chosen vibe. Skip until we've finished hydrating to avoid
+  // overwriting the override with the prop's defaults on first paint.
+  useEffect(() => {
+    if (!hydrated) return;
+    saveCard({ ...data, colorTheme: theme, emoji });
+  }, [data, theme, emoji, hydrated]);
+
+  const customized: CardData = { ...data, colorTheme: theme, emoji };
+
   return (
     <div className="flex w-full max-w-5xl flex-col items-center gap-10">
       <header className="flex flex-col items-center gap-2 text-center">
@@ -29,19 +61,27 @@ export function CardDetail({ data, watermark, premiumUrl }: Props) {
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
             9:16 · story
           </span>
-          <Card data={data} variant="story" watermark={watermark} />
+          <Card data={customized} variant="story" watermark={watermark} />
         </div>
         <div className="flex flex-col items-center gap-3">
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
             1:1 · post
           </span>
-          <Card data={data} variant="post" watermark={watermark} />
+          <Card data={customized} variant="post" watermark={watermark} />
         </div>
       </div>
 
+      <section className="w-full max-w-md space-y-4 rounded-2xl border border-foreground/10 bg-foreground/5 p-5">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
+          Tweak the vibe
+        </h2>
+        <ThemePicker value={theme} onChange={setTheme} />
+        <EmojiPicker value={emoji} onChange={setEmoji} />
+      </section>
+
       <div className="w-full max-w-md space-y-3">
         <CardActions
-          data={data}
+          data={customized}
           targetSelector={`[data-card-id="${data.id}"]`}
         />
         <PremiumCta

@@ -6,7 +6,7 @@ export default function Home() {
     <main className="flex flex-1 flex-col items-center px-6 py-14 sm:py-20">
       <section className="flex w-full max-w-2xl flex-col items-center gap-5 text-center">
         <span className="font-mono text-xs uppercase tracking-[0.28em] text-muted">
-          beta · no login
+          beta · no login · anonymous
         </span>
         <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
           Spill your mess.
@@ -14,8 +14,8 @@ export default function Home() {
           We&apos;ll find your magic.
         </h1>
         <p className="max-w-xl text-pretty text-base text-muted sm:text-lg">
-          Type the chaos. AI turns it into a brag card the internet wants — pick
-          a vibe, share it, save the PNG.
+          Type the chaos. AI turns it into a brag card the internet wants —
+          tweak the vibe, save the PNG, share it, all anonymous.
         </p>
       </section>
 

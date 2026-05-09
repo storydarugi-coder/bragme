@@ -7,8 +7,6 @@ import { saveCard } from "@/lib/card-storage";
 
 const MAX_STORY = 2000;
 const MIN_STORY = 30;
-const MAX_NICK = 30;
-const NICK_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
 const LOADING_LINES = [
   "Reading your aura…",
@@ -35,7 +33,6 @@ function pickLoadingLine(prev?: string): string {
 
 export function BragForm() {
   const router = useRouter();
-  const [nickname, setNickname] = useState("");
   const [story, setStory] = useState("");
   const [generating, setGenerating] = useState(false);
   const [loadingLine, setLoadingLine] = useState(LOADING_LINES[0]);
@@ -50,13 +47,6 @@ export function BragForm() {
   );
 
   function validate(): string | null {
-    const nick = nickname.trim();
-    if (!nick) return "Pick a nickname.";
-    if (nick.length > MAX_NICK)
-      return `Nickname is too long (max ${MAX_NICK} characters).`;
-    if (!NICK_PATTERN.test(nick))
-      return "Nicknames can use letters, numbers, dot, dash, underscore.";
-
     const raw = story.trim();
     if (raw.length < MIN_STORY)
       return `Tell us a bit more — at least ${MIN_STORY} characters.`;
@@ -84,10 +74,7 @@ export function BragForm() {
     try {
       // TODO(step 3): replace mockGenerate with `await fetch("/api/generate", ...)`
       await new Promise((r) => setTimeout(r, 1800));
-      const card = mockGenerate({
-        nickname: nickname.trim(),
-        rawStory: story.trim(),
-      });
+      const card = mockGenerate({ rawStory: story.trim() });
       saveCard(card);
       router.push(`/card/${card.id}`);
     } catch (err) {
@@ -112,25 +99,6 @@ export function BragForm() {
     >
       <label className="flex flex-col gap-1.5">
         <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
-          Nickname
-        </span>
-        <div className="flex items-center rounded-2xl border border-foreground/15 bg-background px-4 focus-within:border-foreground/40">
-          <span className="font-mono text-base text-muted">@</span>
-          <input
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            disabled={generating}
-            maxLength={MAX_NICK + 4}
-            placeholder="lunatypes"
-            className="w-full bg-transparent py-3 pl-1 text-base outline-none placeholder:text-muted/60 disabled:opacity-60"
-            autoComplete="off"
-            autoCapitalize="off"
-          />
-        </div>
-      </label>
-
-      <label className="flex flex-col gap-1.5">
-        <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
           Spill it
         </span>
         <textarea
@@ -146,7 +114,7 @@ export function BragForm() {
             {overLimit ? (
               <span className="text-rose-500">over the limit</span>
             ) : (
-              <>min {MIN_STORY} chars · keep it real</>
+              <>min {MIN_STORY} chars · keep it real · 100% anonymous</>
             )}
           </span>
           <span
@@ -171,6 +139,12 @@ export function BragForm() {
           "Generate my brag card →"
         )}
       </button>
+
+      <p className="text-center text-xs text-muted">
+        We&apos;ll mint you a one-time anonymous handle (like{" "}
+        <span className="font-mono">quiet_kettle_42</span>) — no signup, no
+        email, no real names.
+      </p>
 
       {error && (
         <p
