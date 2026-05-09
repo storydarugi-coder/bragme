@@ -9,7 +9,7 @@ A global Gen-Z web app: dump your messy self-description into a textarea, and AI
 - **Framework:** Next.js 16.2 (App Router, TypeScript, React Compiler)
 - **Styling:** Tailwind CSS v4
 - **AI:** `@anthropic-ai/sdk` — `claude-sonnet-4-6`
-- **Database:** Neon (serverless Postgres) + Drizzle ORM
+- **Database:** Supabase Postgres (pooled connection) + Drizzle ORM via `postgres.js`
 - **Card export:** `html-to-image` (PNG, 9:16 + 1:1)
 - **Deploy:** Vercel
 
@@ -24,12 +24,12 @@ npm run dev:turbo    # Turbopack — faster, but panics on paths with non-ASCII 
 
 ## Required env vars
 
-See `.env.local.example`. You need an Anthropic API key and a Neon `DATABASE_URL` to run end-to-end. All DB access is server-side via API routes — there are no `NEXT_PUBLIC_` DB credentials.
+See `.env.local.example`. You need an Anthropic API key and a Supabase pooled `DATABASE_URL` to run end-to-end. All DB access is server-side via API routes — there are no `NEXT_PUBLIC_` DB credentials.
 
 ## Build plan (9 steps)
 
 1. ✅ Next.js + Tailwind + base config
-2. Neon + Drizzle schema migration
+2. Supabase + Drizzle schema migration
 3. `/api/generate` + Claude SDK
 4. Main page (input form → result)
 5. Card components (6 themes) + PNG download
