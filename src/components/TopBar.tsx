@@ -1,6 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export function TopBar() {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/embed")) return null;
+
   return (
     <header className="sticky top-0 z-30 border-b border-foreground/5 bg-background/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-3">
