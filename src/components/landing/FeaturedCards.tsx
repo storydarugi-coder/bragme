@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FeedCard } from "@/components/FeedCard";
+import { SurpriseMeButton } from "@/components/SurpriseMeButton";
 import type { CardData } from "@/components/card/Card";
 
 type Props = {
@@ -20,12 +21,15 @@ export function FeaturedCards({ cards }: Props) {
             Currently main-charactering.
           </h2>
         </div>
-        <Link
-          href="/feed"
-          className="font-mono text-xs uppercase tracking-[0.2em] text-muted underline-offset-4 hover:text-foreground hover:underline"
-        >
-          full feed →
-        </Link>
+        <div className="flex items-center gap-3">
+          <SurpriseMeButton />
+          <Link
+            href="/feed"
+            className="font-mono text-xs uppercase tracking-[0.2em] text-muted underline-offset-4 hover:text-foreground hover:underline"
+          >
+            full feed →
+          </Link>
+        </div>
       </header>
       <div className="columns-1 gap-6 sm:columns-2 lg:columns-4">
         {cards.map((c) => (

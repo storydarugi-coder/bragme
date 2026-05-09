@@ -60,6 +60,27 @@ export async function getCardById(id: string): Promise<CardData | null> {
 }
 
 /**
+ * Pick a random public card id. Used by /api/random / "Surprise me".
+ * Mock mode picks from MOCK_CARDS; DB mode uses ORDER BY random()
+ * which is fine at our scale — bigger tables would want TABLESAMPLE
+ * or a stored procedure that picks an offset.
+ */
+export async function pickRandomCardId(): Promise<string | null> {
+  if (!dbConfigured()) {
+    if (MOCK_CARDS.length === 0) return null;
+    return MOCK_CARDS[Math.floor(Math.random() * MOCK_CARDS.length)].id;
+  }
+  const db = getDb();
+  const rows = await db
+    .select({ id: schema.cards.id })
+    .from(schema.cards)
+    .where(eq(schema.cards.isPublic, true))
+    .orderBy(sql`random()`)
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
+/**
  * Server-only — fetches the original raw_story behind a card so the
  * refine flow can regenerate without the client having to send it. Used
  * as a fallback when the client doesn't have the story in sessionStorage

@@ -32,9 +32,11 @@ export function FeedCard({ data }: Props) {
   return (
     <Link
       href={`/card/${data.id}`}
-      className="mb-6 block break-inside-avoid transition-transform hover:-translate-y-1"
+      className="group mb-6 block break-inside-avoid transition-all duration-300 hover:-translate-y-2"
     >
-      <Card data={snapshot} variant="story" watermark={false} />
+      <div className="transition-shadow duration-300 group-hover:[&>*]:shadow-[0_30px_60px_-25px_rgba(0,0,0,0.45)]">
+        <Card data={snapshot} variant="story" watermark={false} />
+      </div>
     </Link>
   );
 }

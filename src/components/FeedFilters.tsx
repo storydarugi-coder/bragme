@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { FeedSort } from "@/lib/cards-store";
 import { COLOR_THEMES, type ColorTheme } from "@/db/schema";
+import { SurpriseMeButton } from "./SurpriseMeButton";
 import { THEMES } from "./card/themes";
 
 type Props = {
@@ -47,6 +48,10 @@ export function FeedFilters({ sort, theme }: Props) {
           );
         })}
       </nav>
+
+      <div className="hidden h-6 w-px bg-foreground/10 sm:block" />
+
+      <SurpriseMeButton />
 
       <div className="hidden h-6 w-px bg-foreground/10 sm:block" />
 
