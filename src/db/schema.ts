@@ -52,6 +52,10 @@ export const cards = pgTable(
     index("cards_is_public_idx").on(t.isPublic),
     index("cards_parent_id_idx").on(t.parentId),
     uniqueIndex("cards_nickname_unique_idx").on(t.nickname),
+    // Trending feed: ORDER BY cheers_count DESC, created_at DESC. Composite
+    // index lets Postgres satisfy both the sort and the recency tiebreak
+    // with a single index walk instead of a sort step over a seq scan.
+    index("cards_trending_idx").on(t.cheersCount.desc(), t.createdAt.desc()),
   ],
 );
 

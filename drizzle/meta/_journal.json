@@ -36,6 +36,13 @@
       "when": 1778401000000,
       "tag": "0004_unique_nickname",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778402000000,
+      "tag": "0005_trending_index",
+      "breakpoints": true
     }
   ]
 }
