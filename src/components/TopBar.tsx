@@ -24,6 +24,12 @@ export function TopBar() {
             Feed
           </Link>
           <Link
+            href="/stats"
+            className="rounded-full px-3 py-1.5 hover:bg-foreground/5"
+          >
+            Stats
+          </Link>
+          <Link
             href="/mine"
             className="rounded-full px-3 py-1.5 hover:bg-foreground/5"
           >

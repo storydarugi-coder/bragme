@@ -63,6 +63,101 @@ export async function getCardById(id: string): Promise<CardData | null> {
   return row ? toCardData(row) : null;
 }
 
+export type GlobalStats = {
+  totalCards: number;
+  totalReactions: {
+    cheer: number;
+    unhinged: number;
+    facts: number;
+    feltThat: number;
+  };
+  topTheme: { theme: ColorTheme; count: number } | null;
+  topCard: CardData | null;
+};
+
+export async function getGlobalStats(): Promise<GlobalStats> {
+  if (!dbConfigured()) {
+    const totals = MOCK_CARDS.reduce(
+      (acc, c) => ({
+        cheer: acc.cheer + c.cheersCount,
+        unhinged: acc.unhinged + c.unhingedCount,
+        facts: acc.facts + c.factsCount,
+        feltThat: acc.feltThat + c.feltThatCount,
+      }),
+      { cheer: 0, unhinged: 0, facts: 0, feltThat: 0 },
+    );
+    const themeCounts = MOCK_CARDS.reduce<Record<string, number>>(
+      (acc, c) => {
+        acc[c.colorTheme] = (acc[c.colorTheme] ?? 0) + 1;
+        return acc;
+      },
+      {},
+    );
+    const topThemeEntry = Object.entries(themeCounts).sort(
+      (a, b) => b[1] - a[1],
+    )[0];
+    const topCard = [...MOCK_CARDS].sort(
+      (a, b) => b.cheersCount - a.cheersCount,
+    )[0];
+    return {
+      totalCards: MOCK_CARDS.length,
+      totalReactions: totals,
+      topTheme: topThemeEntry
+        ? {
+            theme: topThemeEntry[0] as ColorTheme,
+            count: topThemeEntry[1],
+          }
+        : null,
+      topCard: topCard ?? null,
+    };
+  }
+
+  const db = getDb();
+
+  const [agg] = await db
+    .select({
+      totalCards: sql<number>`count(*)::int`,
+      totalCheer: sql<number>`coalesce(sum(${schema.cards.cheersCount}), 0)::int`,
+      totalUnhinged: sql<number>`coalesce(sum(${schema.cards.unhingedCount}), 0)::int`,
+      totalFacts: sql<number>`coalesce(sum(${schema.cards.factsCount}), 0)::int`,
+      totalFeltThat: sql<number>`coalesce(sum(${schema.cards.feltThatCount}), 0)::int`,
+    })
+    .from(schema.cards)
+    .where(eq(schema.cards.isPublic, true));
+
+  const themeRows = await db
+    .select({
+      theme: schema.cards.colorTheme,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(schema.cards)
+    .where(eq(schema.cards.isPublic, true))
+    .groupBy(schema.cards.colorTheme)
+    .orderBy(desc(sql`count(*)`))
+    .limit(1);
+
+  const [topRow] = await db
+    .select()
+    .from(schema.cards)
+    .where(eq(schema.cards.isPublic, true))
+    .orderBy(desc(schema.cards.cheersCount))
+    .limit(1);
+
+  return {
+    totalCards: agg?.totalCards ?? 0,
+    totalReactions: {
+      cheer: agg?.totalCheer ?? 0,
+      unhinged: agg?.totalUnhinged ?? 0,
+      facts: agg?.totalFacts ?? 0,
+      feltThat: agg?.totalFeltThat ?? 0,
+    },
+    topTheme: themeRows[0]
+      ? { theme: themeRows[0].theme, count: themeRows[0].count }
+      : null,
+    topCard: topRow ? toCardData(topRow) : null,
+  };
+}
+
 /**
  * Pick a random public card id. Used by /api/random / "Surprise me".
  * Mock mode picks from MOCK_CARDS; DB mode uses ORDER BY random()
