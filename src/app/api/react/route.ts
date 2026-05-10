@@ -1,30 +1,44 @@
 import { bumpReaction, getCardById } from "@/lib/cards-store";
 import { isReaction, type Reaction } from "@/components/card/Card";
+import { clientFingerprint } from "@/lib/client-ip";
+import { getRedis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Per (IP, card, reaction) lockout, in-memory + per-region. Same trade-off
-// as the original cheer endpoint — swap for Vercel KV / Upstash for
-// production durability.
-const VOTED = new Map<string, number>();
-const WINDOW_MS = 24 * 60 * 60 * 1000;
+const WINDOW_SEC = 24 * 60 * 60;
 
-function ipFor(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return req.headers.get("x-real-ip")?.trim() ?? "unknown";
+// In-memory dedupe — only used when Upstash isn't configured (local dev).
+// On serverless this Map doesn't survive cold starts, so prod must set
+// UPSTASH_REDIS_REST_URL/TOKEN.
+const memVoted = new Map<string, number>();
+
+function alreadyReactedMem(key: string) {
+  const now = Date.now();
+  const ts = memVoted.get(key);
+  if (ts && now - ts < WINDOW_SEC * 1000) return true;
+  memVoted.set(key, now);
+  return false;
 }
 
-function alreadyReacted(ip: string, cardId: string, reaction: Reaction) {
-  const key = `${ip}::${cardId}::${reaction}`;
-  const ts = VOTED.get(key);
-  if (ts && Date.now() - ts < WINDOW_MS) return true;
-  VOTED.set(key, Date.now());
-  return false;
+async function alreadyReacted(
+  fingerprint: string,
+  cardId: string,
+  reaction: Reaction,
+): Promise<boolean> {
+  const key = `react:${fingerprint}:${cardId}:${reaction}`;
+  const redis = getRedis();
+  if (!redis) return alreadyReactedMem(key);
+
+  try {
+    // SET NX EX: atomic "claim this slot for 24h or report it's taken".
+    // Returns "OK" on success, null if the key already existed.
+    const claimed = await redis.set(key, "1", { nx: true, ex: WINDOW_SEC });
+    return claimed === null;
+  } catch (err) {
+    console.warn("[react] redis dedupe failed, allowing", err);
+    return false;
+  }
 }
 
 function fail(code: string, message: string, status: number) {
@@ -55,8 +69,8 @@ export async function POST(request: Request) {
   const cardId = body.card_id;
   const reaction = body.reaction;
 
-  const ip = ipFor(request);
-  if (alreadyReacted(ip, cardId, reaction)) {
+  const fingerprint = clientFingerprint(request);
+  if (await alreadyReacted(fingerprint, cardId, reaction)) {
     return fail(
       "ALREADY_REACTED",
       "You already gave this reaction. Spread the love elsewhere.",

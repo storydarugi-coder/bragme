@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { generateBragCard, isVibeModifier } from "@/lib/claude";
 import { generateHandle } from "@/lib/handle";
 import { checkRate } from "@/lib/rate-limit";
+import { clientFingerprint } from "@/lib/client-ip";
 import { getRawStoryById, insertCard } from "@/lib/cards-store";
 
 export const dynamic = "force-dynamic";
@@ -9,15 +10,6 @@ export const runtime = "nodejs";
 
 const MIN_STORY = 30;
 const MAX_STORY = 2000;
-
-function getClientIp(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return req.headers.get("x-real-ip")?.trim() ?? "unknown";
-}
 
 function fail(code: string, message: string, status: number, extra?: HeadersInit) {
   return Response.json(
@@ -69,8 +61,8 @@ export async function POST(request: Request) {
   // 3. Rate limit (refine shares the same per-IP bucket as /api/generate
   // would in production, but we use a separate key so users can do one
   // generate + one refine per minute rather than one of either).
-  const ip = getClientIp(request);
-  const rate = checkRate(`refine:${ip}`);
+  const fingerprint = clientFingerprint(request);
+  const rate = await checkRate(`refine:${fingerprint}`);
   if (!rate.ok) {
     return fail(
       "RATE_LIMITED",

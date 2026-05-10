@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { translateCard } from "@/lib/claude";
 import { generateHandle } from "@/lib/handle";
 import { checkRate } from "@/lib/rate-limit";
+import { clientFingerprint } from "@/lib/client-ip";
 import {
   getCardById,
   getRawStoryById,
@@ -11,15 +12,6 @@ import { isLanguageCode, nameForLanguage } from "@/lib/languages";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-function getClientIp(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  return req.headers.get("x-real-ip")?.trim() ?? "unknown";
-}
 
 function fail(code: string, message: string, status: number, extra?: HeadersInit) {
   return Response.json(
@@ -45,8 +37,8 @@ export async function POST(request: Request) {
   const targetCode = body.target_language;
 
   // 2. Rate limit (own bucket)
-  const ip = getClientIp(request);
-  const rate = checkRate(`translate:${ip}`);
+  const fingerprint = clientFingerprint(request);
+  const rate = await checkRate(`translate:${fingerprint}`);
   if (!rate.ok) {
     return fail(
       "RATE_LIMITED",

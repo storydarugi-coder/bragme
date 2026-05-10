@@ -28,12 +28,28 @@ The app degrades gracefully when secrets are missing:
 |---|---|
 | `ANTHROPIC_API_KEY` | Form falls back to a local mock generator |
 | `DATABASE_URL` | Reads/writes fall back to `MOCK_CARDS`; cards live in `sessionStorage` only |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | Rate limit + reaction dedupe fall back to per-instance memory (effectively off on serverless) |
+| `IP_HASH_SALT` | A fixed dev salt is used; safe locally, set this in prod |
 | `LEMON_PREMIUM_URL` | Premium CTA shows a "coming soon" placeholder |
 | `NEXT_PUBLIC_BMC_USERNAME` | BMC widget hides itself |
 
 ## Required env vars
 
-See `.env.local.example`. For full functionality you need an Anthropic API key and a Supabase pooled `DATABASE_URL`. All DB access is server-side via API routes — there are no `NEXT_PUBLIC_` DB credentials.
+See \`.env.local.example\`. For full functionality you need:
+- an Anthropic API key,
+- a Supabase pooled \`DATABASE_URL\`,
+- and an Upstash Redis pair (\`UPSTASH_REDIS_REST_URL\` + \`UPSTASH_REDIS_REST_TOKEN\`) plus an \`IP_HASH_SALT\` so rate limiting and reaction dedupe survive serverless cold starts.
+
+All DB / Redis access is server-side via API routes — there are no \`NEXT_PUBLIC_\` credentials.
+
+### Upstash Redis setup
+
+1. [console.upstash.com](https://console.upstash.com) → **Create Database** (any region close to your Vercel deployment).
+2. From the DB page → **REST API** → copy the \`UPSTASH_REDIS_REST_URL\` and \`UPSTASH_REDIS_REST_TOKEN\`.
+3. Generate a random salt: \`openssl rand -hex 32\` → paste as \`IP_HASH_SALT\`.
+4. Add all three to Vercel → Project Settings → Environment Variables for **Production** and **Preview**.
+
+The free tier (10k requests/day) is plenty for early-stage traffic.
 
 ## Database setup
 

@@ -3,23 +3,13 @@ import { insertCard } from "@/lib/cards-store";
 import { generateBragCard } from "@/lib/claude";
 import { generateHandle } from "@/lib/handle";
 import { checkRate } from "@/lib/rate-limit";
+import { clientFingerprint } from "@/lib/client-ip";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MIN_STORY = 30;
 const MAX_STORY = 2000;
-
-function getClientIp(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const xri = req.headers.get("x-real-ip");
-  if (xri) return xri.trim();
-  return "unknown";
-}
 
 function fail(code: string, message: string, status: number, extra?: HeadersInit) {
   return Response.json(
@@ -50,9 +40,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // 2. Rate limit
-  const ip = getClientIp(request);
-  const rate = checkRate(ip);
+  // 2. Rate limit (key is hashed IP — never the raw IP)
+  const fingerprint = clientFingerprint(request);
+  const rate = await checkRate(`generate:${fingerprint}`);
   if (!rate.ok) {
     return fail(
       "RATE_LIMITED",
