@@ -22,7 +22,25 @@ export type CardData = {
   emoji: string;
   colorTheme: ColorTheme;
   cheersCount: number;
+  unhingedCount: number;
+  factsCount: number;
+  feltThatCount: number;
 };
+
+export type Reaction = "cheer" | "unhinged" | "facts" | "felt-that";
+
+export const REACTIONS: Readonly<
+  Array<{ id: Reaction; emoji: string; label: string; field: keyof CardData }>
+> = [
+  { id: "cheer", emoji: "🥂", label: "cheer", field: "cheersCount" },
+  { id: "unhinged", emoji: "🔥", label: "unhinged", field: "unhingedCount" },
+  { id: "facts", emoji: "💯", label: "facts", field: "factsCount" },
+  { id: "felt-that", emoji: "🥲", label: "felt that", field: "feltThatCount" },
+] as const;
+
+export function isReaction(value: unknown): value is Reaction {
+  return REACTIONS.some((r) => r.id === value);
+}
 
 type Props = {
   data: CardData;

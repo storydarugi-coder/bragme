@@ -110,6 +110,9 @@ export async function POST(request: Request) {
         emoji: translated.emoji,
         colorTheme: translated.colorTheme,
         cheersCount: 0,
+        unhingedCount: 0,
+        factsCount: 0,
+        feltThatCount: 0,
       };
 
     return Response.json({ card });

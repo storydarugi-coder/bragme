@@ -35,6 +35,9 @@ export const cards = pgTable(
     emoji: text("emoji").notNull(),
     colorTheme: colorThemeEnum("color_theme").notNull(),
     cheersCount: integer("cheers_count").notNull().default(0),
+    unhingedCount: integer("unhinged_count").notNull().default(0),
+    factsCount: integer("facts_count").notNull().default(0),
+    feltThatCount: integer("felt_that_count").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -18,6 +18,9 @@ export const MOCK_CARDS: CardData[] = [
     emoji: "📓",
     colorTheme: "sunset",
     cheersCount: 142,
+    unhingedCount: 23,
+    factsCount: 67,
+    feltThatCount: 89,
   },
   {
     id: "mock-2",
@@ -33,6 +36,9 @@ export const MOCK_CARDS: CardData[] = [
     emoji: "🌊",
     colorTheme: "ocean",
     cheersCount: 318,
+    unhingedCount: 92,
+    factsCount: 41,
+    feltThatCount: 156,
   },
   {
     id: "mock-3",
@@ -48,6 +54,9 @@ export const MOCK_CARDS: CardData[] = [
     emoji: "🌿",
     colorTheme: "forest",
     cheersCount: 87,
+    unhingedCount: 14,
+    factsCount: 33,
+    feltThatCount: 51,
   },
   {
     id: "mock-4",
@@ -63,6 +72,9 @@ export const MOCK_CARDS: CardData[] = [
     emoji: "🔮",
     colorTheme: "lavender",
     cheersCount: 521,
+    unhingedCount: 287,
+    factsCount: 198,
+    feltThatCount: 312,
   },
   {
     id: "mock-5",
@@ -78,6 +90,9 @@ export const MOCK_CARDS: CardData[] = [
     emoji: "🍑",
     colorTheme: "peach",
     cheersCount: 64,
+    unhingedCount: 9,
+    factsCount: 88,
+    feltThatCount: 122,
   },
   {
     id: "mock-6",
@@ -93,6 +108,9 @@ export const MOCK_CARDS: CardData[] = [
     emoji: "🖤",
     colorTheme: "mono",
     cheersCount: 209,
+    unhingedCount: 156,
+    factsCount: 287,
+    feltThatCount: 198,
   },
   {
     id: "mock-7",
@@ -108,6 +126,9 @@ export const MOCK_CARDS: CardData[] = [
     emoji: "🍯",
     colorTheme: "sunset",
     cheersCount: 96,
+    unhingedCount: 71,
+    factsCount: 53,
+    feltThatCount: 132,
   },
   {
     id: "mock-8",
@@ -123,6 +144,9 @@ export const MOCK_CARDS: CardData[] = [
     emoji: "⚓",
     colorTheme: "ocean",
     cheersCount: 153,
+    unhingedCount: 42,
+    factsCount: 198,
+    feltThatCount: 167,
   },
 ];
 
@@ -198,5 +222,8 @@ export function mockGenerate({ rawStory }: { rawStory: string }): CardData {
     emoji: FALLBACK_EMOJIS[Math.floor(Math.random() * FALLBACK_EMOJIS.length)],
     colorTheme: theme,
     cheersCount: Math.floor(Math.random() * 200) + 5,
+    unhingedCount: Math.floor(Math.random() * 150) + 1,
+    factsCount: Math.floor(Math.random() * 180) + 1,
+    feltThatCount: Math.floor(Math.random() * 160) + 1,
   };
 }

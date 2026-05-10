@@ -29,6 +29,9 @@ function toCardData(row: CardRow): CardData {
     emoji: row.emoji,
     colorTheme: row.colorTheme,
     cheersCount: row.cheersCount,
+    unhingedCount: row.unhingedCount,
+    factsCount: row.factsCount,
+    feltThatCount: row.feltThatCount,
   };
 }
 
@@ -200,14 +203,52 @@ export async function insertCard(
   return row ? toCardData(row) : null;
 }
 
-/** Atomically increments cheers_count and returns the new value. */
-export async function bumpCheers(id: string): Promise<number | null> {
+import type { Reaction } from "@/components/card/Card";
+
+/**
+ * Atomically increments the column for the given reaction. Returns the
+ * new count, or null if DB isn't configured (mock mode — caller should
+ * fall back to optimistic local state).
+ */
+export async function bumpReaction(
+  id: string,
+  reaction: Reaction,
+): Promise<number | null> {
   if (!dbConfigured()) return null;
   const db = getDb();
-  const [row] = await db
-    .update(schema.cards)
-    .set({ cheersCount: sql`${schema.cards.cheersCount} + 1` })
-    .where(eq(schema.cards.id, id))
-    .returning({ cheersCount: schema.cards.cheersCount });
-  return row?.cheersCount ?? null;
+
+  switch (reaction) {
+    case "cheer": {
+      const [row] = await db
+        .update(schema.cards)
+        .set({ cheersCount: sql`${schema.cards.cheersCount} + 1` })
+        .where(eq(schema.cards.id, id))
+        .returning({ count: schema.cards.cheersCount });
+      return row?.count ?? null;
+    }
+    case "unhinged": {
+      const [row] = await db
+        .update(schema.cards)
+        .set({ unhingedCount: sql`${schema.cards.unhingedCount} + 1` })
+        .where(eq(schema.cards.id, id))
+        .returning({ count: schema.cards.unhingedCount });
+      return row?.count ?? null;
+    }
+    case "facts": {
+      const [row] = await db
+        .update(schema.cards)
+        .set({ factsCount: sql`${schema.cards.factsCount} + 1` })
+        .where(eq(schema.cards.id, id))
+        .returning({ count: schema.cards.factsCount });
+      return row?.count ?? null;
+    }
+    case "felt-that": {
+      const [row] = await db
+        .update(schema.cards)
+        .set({ feltThatCount: sql`${schema.cards.feltThatCount} + 1` })
+        .where(eq(schema.cards.id, id))
+        .returning({ count: schema.cards.feltThatCount });
+      return row?.count ?? null;
+    }
+  }
 }

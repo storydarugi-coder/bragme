@@ -113,6 +113,9 @@ export async function POST(request: Request) {
         emoji: generated.emoji,
         colorTheme: generated.colorTheme,
         cheersCount: 0,
+        unhingedCount: 0,
+        factsCount: 0,
+        feltThatCount: 0,
       };
 
     return Response.json({ card, rawStory });

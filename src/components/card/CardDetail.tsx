@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Card, type CardData, type CardVariant } from "./Card";
+import {
+  Card,
+  REACTIONS,
+  type CardData,
+  type CardVariant,
+  type Reaction,
+} from "./Card";
 import { CardActions } from "./CardActions";
 import { ThemePicker } from "./ThemePicker";
 import { EmojiPicker } from "./EmojiPicker";
@@ -13,10 +19,10 @@ import { TranslatePicker } from "./TranslatePicker";
 import { PremiumCta } from "@/components/PremiumCta";
 import { loadCard, saveCard } from "@/lib/card-storage";
 import {
-  hasCheered,
-  loadCheerCount,
-  markCheered,
-  saveCheerCount,
+  hasReacted,
+  loadReactionCount,
+  markReacted,
+  saveReactionCount,
 } from "@/lib/cheer-storage";
 import type { ColorTheme } from "@/db/schema";
 
@@ -38,11 +44,27 @@ const VARIANTS_BY_LAYOUT: Record<LayoutMode, CardVariant[]> = {
   manga: ["manga"],
 };
 
+type ReactionCounts = {
+  cheer: number;
+  unhinged: number;
+  facts: number;
+  "felt-that": number;
+};
+
+function initialCounts(data: CardData): ReactionCounts {
+  return {
+    cheer: data.cheersCount,
+    unhinged: data.unhingedCount,
+    facts: data.factsCount,
+    "felt-that": data.feltThatCount,
+  };
+}
+
 export function CardDetail({ data, watermark, premiumUrl }: Props) {
   const [theme, setTheme] = useState<ColorTheme>(data.colorTheme);
   const [emoji, setEmoji] = useState(data.emoji);
-  const [cheers, setCheers] = useState(data.cheersCount);
-  const [cheered, setCheered] = useState(false);
+  const [counts, setCounts] = useState<ReactionCounts>(() => initialCounts(data));
+  const [reacted, setReacted] = useState<Set<Reaction>>(() => new Set());
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("default");
   const [hydrated, setHydrated] = useState(false);
 
@@ -52,38 +74,55 @@ export function CardDetail({ data, watermark, premiumUrl }: Props) {
       setTheme(stored.colorTheme);
       setEmoji(stored.emoji);
     }
-    const storedCount = loadCheerCount(data.id);
-    if (storedCount !== null) setCheers(storedCount);
-    setCheered(hasCheered(data.id));
+    const nextCounts = initialCounts(data);
+    const nextReacted = new Set<Reaction>();
+    for (const r of REACTIONS) {
+      const stored = loadReactionCount(data.id, r.id);
+      if (stored !== null) nextCounts[r.id] = stored;
+      if (hasReacted(data.id, r.id)) nextReacted.add(r.id);
+    }
+    setCounts(nextCounts);
+    setReacted(nextReacted);
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.id]);
 
   useEffect(() => {
     if (!hydrated) return;
-    saveCard({ ...data, colorTheme: theme, emoji, cheersCount: cheers });
-  }, [data, theme, emoji, cheers, hydrated]);
+    saveCard({
+      ...data,
+      colorTheme: theme,
+      emoji,
+      cheersCount: counts.cheer,
+      unhingedCount: counts.unhinged,
+      factsCount: counts.facts,
+      feltThatCount: counts["felt-that"],
+    });
+  }, [data, theme, emoji, counts, hydrated]);
 
-  function handleCheer() {
-    if (cheered) return;
-    const next = cheers + 1;
-    setCheers(next);
-    setCheered(true);
-    markCheered(data.id);
-    saveCheerCount(data.id, next);
+  function handleReact(reaction: Reaction) {
+    if (reacted.has(reaction)) return;
+    const next = counts[reaction] + 1;
+    setCounts((prev) => ({ ...prev, [reaction]: next }));
+    setReacted((prev) => new Set(prev).add(reaction));
+    markReacted(data.id, reaction);
+    saveReactionCount(data.id, reaction, next);
 
-    void fetch("/api/cheer", {
+    void fetch("/api/react", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ card_id: data.id }),
-    }).catch((err) => console.warn("[cheer] persist failed", err));
+      body: JSON.stringify({ card_id: data.id, reaction }),
+    }).catch((err) => console.warn("[react] persist failed", err));
   }
 
   const customized: CardData = {
     ...data,
     colorTheme: theme,
     emoji,
-    cheersCount: cheers,
+    cheersCount: counts.cheer,
+    unhingedCount: counts.unhinged,
+    factsCount: counts.facts,
+    feltThatCount: counts["felt-that"],
   };
 
   const variants = VARIANTS_BY_LAYOUT[layoutMode];
@@ -136,7 +175,7 @@ export function CardDetail({ data, watermark, premiumUrl }: Props) {
           alreadyPremium={!watermark}
           premiumUrl={premiumUrl}
         />
-        <CheersRow count={cheers} cheered={cheered} onCheer={handleCheer} />
+        <ReactionsRow counts={counts} reacted={reacted} onReact={handleReact} />
         <ShareText data={customized} />
       </div>
 
@@ -175,52 +214,85 @@ function labelFor(variant: CardVariant): string {
   }
 }
 
-function CheersRow({
-  count,
-  cheered,
-  onCheer,
+function ReactionsRow({
+  counts,
+  reacted,
+  onReact,
 }: {
-  count: number;
-  cheered: boolean;
-  onCheer: () => void;
+  counts: ReactionCounts;
+  reacted: Set<Reaction>;
+  onReact: (r: Reaction) => void;
 }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {REACTIONS.map((r) => (
+        <ReactionButton
+          key={r.id}
+          reaction={r.id}
+          emoji={r.emoji}
+          label={r.label}
+          count={counts[r.id]}
+          active={reacted.has(r.id)}
+          onClick={() => onReact(r.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ReactionButton({
+  reaction,
+  emoji,
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  reaction: Reaction;
+  emoji: string;
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  void reaction;
   const [pulse, setPulse] = useState(false);
 
   function handleClick() {
-    if (cheered) return;
+    if (active) return;
     setPulse(true);
     setTimeout(() => setPulse(false), 400);
-    onCheer();
+    onClick();
   }
 
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-foreground/10 bg-foreground/5 px-4 py-3 text-sm">
-      <span className="text-muted">
-        <span
-          className={[
-            "inline-block font-semibold text-foreground tabular-nums transition-transform duration-300",
-            pulse ? "scale-125" : "scale-100",
-          ].join(" ")}
-        >
-          {count.toLocaleString()}
-        </span>{" "}
-        cheers
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={active}
+      aria-pressed={active}
+      className={[
+        "flex flex-col items-center gap-0.5 rounded-2xl border px-2 py-2.5 text-center transition-all duration-200",
+        pulse ? "scale-110" : "scale-100",
+        active
+          ? "cursor-default border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+          : "border-foreground/10 bg-foreground/5 hover:border-foreground/20 hover:bg-foreground/10",
+      ].join(" ")}
+    >
+      <span className="text-xl leading-none" aria-hidden>
+        {emoji}
       </span>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={cheered}
-        aria-pressed={cheered}
+      <span
         className={[
-          "rounded-full px-4 py-1.5 font-mono text-xs font-medium uppercase tracking-[0.15em] transition-all duration-200",
-          pulse ? "scale-110" : "scale-100",
-          cheered
-            ? "cursor-default bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-            : "bg-foreground/10 hover:bg-foreground/20",
+          "font-semibold tabular-nums leading-tight transition-transform duration-300",
+          pulse ? "scale-125" : "scale-100",
         ].join(" ")}
       >
-        {cheered ? "🥂 cheered" : "🥂 cheer"}
-      </button>
-    </div>
+        {count.toLocaleString()}
+      </span>
+      <span className="font-mono text-[9px] uppercase tracking-[0.15em] leading-tight">
+        {label}
+      </span>
+    </button>
   );
 }
