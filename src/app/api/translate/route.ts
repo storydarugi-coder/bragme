@@ -9,6 +9,7 @@ import {
   insertCard,
 } from "@/lib/cards-store";
 import { isLanguageCode, nameForLanguage } from "@/lib/languages";
+import { bumpAndCheckDailyCap } from "@/lib/ai-cost-cap";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -57,7 +58,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // 4. Load source card
+  // 4. Global daily cost cap.
+  const cap = await bumpAndCheckDailyCap();
+  if (!cap.ok) {
+    return fail(
+      "AI_DAILY_CAP_REACHED",
+      "AI is taking a break for the day. Try again tomorrow?",
+      503,
+    );
+  }
+
+  // 5. Load source card
   const source = await getCardById(cardId);
   if (!source) {
     return fail("NOT_FOUND", "Couldn't find that card.", 404);

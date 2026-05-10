@@ -98,3 +98,14 @@ export const reactions = pgTable(
 
 export type RateLimitRow = typeof rateLimit.$inferSelect;
 export type ReactionRow = typeof reactions.$inferSelect;
+
+// Daily counter of Anthropic API calls. One row per UTC date. Bumped by
+// every successful generate / refine / translate; checked against
+// AI_DAILY_CAP before kicking off a new call so a runaway / abuse
+// scenario can't accidentally drain the API budget.
+export const dailyAiCalls = pgTable("daily_ai_calls", {
+  dateKey: text("date_key").primaryKey(),
+  count: integer("count").notNull().default(0),
+});
+
+export type DailyAiCallsRow = typeof dailyAiCalls.$inferSelect;

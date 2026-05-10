@@ -4,6 +4,8 @@ import { generateBragCard } from "@/lib/claude";
 import { generateHandle } from "@/lib/handle";
 import { checkRate } from "@/lib/rate-limit";
 import { clientFingerprint } from "@/lib/client-ip";
+import { moderateStory } from "@/lib/moderation";
+import { bumpAndCheckDailyCap } from "@/lib/ai-cost-cap";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,7 +42,14 @@ export async function POST(request: Request) {
     );
   }
 
-  // 2. Rate limit (key is hashed IP — never the raw IP)
+  // 2. Cheap content gate — block obvious spam (URLs, key-mash, screaming
+  // caps) before we burn either a rate-limit slot or an AI call on it.
+  const moderation = moderateStory(rawStory);
+  if (!moderation.ok) {
+    return fail("CONTENT_REJECTED", moderation.reason, 400);
+  }
+
+  // 3. Rate limit (key is hashed IP — never the raw IP)
   const fingerprint = clientFingerprint(request);
   const rate = await checkRate(`generate:${fingerprint}`);
   if (!rate.ok) {
@@ -52,7 +61,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // 3. Require Anthropic key — surface a friendly status so the form can
+  // 4. Require Anthropic key — surface a friendly status so the form can
   // optionally fall back to mock generation in dev environments.
   if (!process.env.ANTHROPIC_API_KEY) {
     return fail(
@@ -62,7 +71,18 @@ export async function POST(request: Request) {
     );
   }
 
-  // 4. Generate + persist
+  // 5. Global daily cost cap — protects the API budget if the per-IP
+  // limiter ever gets bypassed (proxy IP rotation etc).
+  const cap = await bumpAndCheckDailyCap();
+  if (!cap.ok) {
+    return fail(
+      "AI_DAILY_CAP_REACHED",
+      "AI is taking a break for the day. Try again tomorrow?",
+      503,
+    );
+  }
+
+  // 6. Generate + persist
   try {
     const generated = await generateBragCard(rawStory);
     const handle = generateHandle();

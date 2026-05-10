@@ -4,6 +4,8 @@ import { generateHandle } from "@/lib/handle";
 import { checkRate } from "@/lib/rate-limit";
 import { clientFingerprint } from "@/lib/client-ip";
 import { getRawStoryById, insertCard } from "@/lib/cards-store";
+import { moderateStory } from "@/lib/moderation";
+import { bumpAndCheckDailyCap } from "@/lib/ai-cost-cap";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -58,7 +60,14 @@ export async function POST(request: Request) {
     );
   }
 
-  // 3. Rate limit (refine shares the same per-IP bucket as /api/generate
+  // 3. Moderation gate — refine accepts client-supplied raw_story so
+  // the same spam heuristics that protect /api/generate apply here.
+  const moderation = moderateStory(rawStory);
+  if (!moderation.ok) {
+    return fail("CONTENT_REJECTED", moderation.reason, 400);
+  }
+
+  // 4. Rate limit (refine shares the same per-IP bucket as /api/generate
   // would in production, but we use a separate key so users can do one
   // generate + one refine per minute rather than one of either).
   const fingerprint = clientFingerprint(request);
@@ -72,7 +81,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // 4. Anthropic key required
+  // 5. Anthropic key required
   if (!process.env.ANTHROPIC_API_KEY) {
     return fail(
       "AI_NOT_CONFIGURED",
@@ -81,7 +90,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // 5. Generate with the chosen modifier, persist a new card, redirect.
+  // 6. Global daily cost cap.
+  const cap = await bumpAndCheckDailyCap();
+  if (!cap.ok) {
+    return fail(
+      "AI_DAILY_CAP_REACHED",
+      "AI is taking a break for the day. Try again tomorrow?",
+      503,
+    );
+  }
+
+  // 7. Generate with the chosen modifier, persist a new card, redirect.
   try {
     const generated = await generateBragCard(rawStory, modifier);
     const handle = generateHandle();
