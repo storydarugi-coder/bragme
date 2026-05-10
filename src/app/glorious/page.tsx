@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { BragFormKo } from "@/components/glorious/BragFormKo";
 import { GloriousNav } from "@/components/glorious/GloriousNav";
+import { DailyPrompt } from "@/components/landing/DailyPrompt";
 import { HeroCardStack } from "@/components/landing/HeroCardStack";
 import { FeedCard } from "@/components/FeedCard";
 import { listFeed } from "@/lib/cards-store";
+import { pickDailyPrompt } from "@/lib/daily-prompts";
 
 export const metadata = {
   title: "BragMe · 한국어 미리보기",
@@ -44,6 +46,7 @@ const STEPS = [
 export default async function GloriousHome() {
   const { cards } = await listFeed({ sort: "trending" });
   const featured = cards.slice(0, 4);
+  const prompt = pickDailyPrompt("ko");
 
   return (
     <main className="flex flex-1 flex-col gap-20 px-6 pb-24 pt-10 sm:gap-24 sm:pt-16">
@@ -66,6 +69,8 @@ export default async function GloriousHome() {
             드립니다 — 바이브 다듬기, PNG 저장, 공유까지 전부 익명.
           </p>
         </div>
+
+        <DailyPrompt prompt={prompt} label="오늘의 주제 · 이거 써도 되고 너의 거 써도 됨" />
 
         <div id="spill" className="flex w-full justify-center scroll-mt-20">
           <BragFormKo />

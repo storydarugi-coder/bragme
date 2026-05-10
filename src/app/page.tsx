@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BragForm } from "@/components/BragForm";
+import { DailyPrompt } from "@/components/landing/DailyPrompt";
 import { HeroCardStack } from "@/components/landing/HeroCardStack";
 import { TrustStrip } from "@/components/landing/TrustStrip";
 import { HowItWorks } from "@/components/landing/HowItWorks";
@@ -7,6 +8,7 @@ import { FeaturedCards } from "@/components/landing/FeaturedCards";
 import { FinalCta } from "@/components/landing/FinalCta";
 import { listFeed } from "@/lib/cards-store";
 import { pickHeroVariant } from "@/lib/hero-variants";
+import { pickDailyPrompt } from "@/lib/daily-prompts";
 
 // Featured cards may move with new content — re-fetch on visit.
 export const dynamic = "force-dynamic";
@@ -15,6 +17,7 @@ export default async function Home() {
   const { cards } = await listFeed({ sort: "trending" });
   const featured = cards.slice(0, 4);
   const hero = pickHeroVariant();
+  const prompt = pickDailyPrompt("en");
 
   return (
     <main className="flex flex-1 flex-col gap-20 px-6 pb-24 pt-10 sm:gap-24 sm:pt-16">
@@ -34,6 +37,8 @@ export default async function Home() {
             {hero.subtitle}
           </p>
         </div>
+
+        <DailyPrompt prompt={prompt} label="today's prompt · pick this or yours" />
 
         <div id="spill" className="flex w-full justify-center scroll-mt-20">
           <BragForm />
