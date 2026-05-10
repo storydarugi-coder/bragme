@@ -1,19 +1,26 @@
-import { getRedis } from "@/lib/redis";
+import { sql } from "drizzle-orm";
+import { getDb, schema } from "@/db/client";
 
-// Per-key rate limiter. Same semantics as before — one request per
-// `windowSec` per key — but Redis-backed when configured so the bucket
-// survives serverless cold starts and is shared across regions.
+// Per-key rate limiter, backed by the `rate_limit` Postgres table so the
+// bucket survives serverless cold starts and is shared across regions.
+// Same semantics as the original in-memory limiter — one allowed request
+// per `windowSec` per key.
 //
-// Falls back to a per-instance in-memory Map when Upstash env vars are
-// missing. That fallback is only useful for local dev; on serverless it
-// effectively disables rate limiting. Production must set
-// UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN.
+// Falls back to a per-instance in-memory Map when DATABASE_URL is unset.
+// That fallback is only useful for local dev; on serverless it
+// effectively disables rate limiting.
 
 const DEFAULT_WINDOW_SEC = 60;
 
 export type RateResult =
   | { ok: true }
   | { ok: false; retryAfterSec: number };
+
+function dbConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL);
+}
+
+// ---------- in-memory fallback (dev only) ----------
 
 const memBuckets = new Map<string, number>();
 let lastSweep = 0;
@@ -40,36 +47,55 @@ function checkMem(key: string, windowMs: number): RateResult {
   return { ok: true };
 }
 
+// ---------- Postgres path ----------
+
 /**
- * Fail-open: if Redis throws (network blip, quota), we let the request
- * through rather than 503-ing the whole product. The leaky-bucket
- * promise is "best effort" anyway — abuse is bounded by AI cost caps
- * and the dedupe layer, not by this limiter alone.
+ * Atomic upsert: if the row doesn't exist OR its expires_at is already in
+ * the past, claim a fresh TTL and report success. If the row exists and
+ * is still valid, the WHERE clause on DO UPDATE skips the update and
+ * RETURNING yields no rows — that's our "rate limited" signal.
+ *
+ * Fail-open: if the DB throws (network blip, pool exhaustion), allow the
+ * request through rather than 503-ing the form. AI cost caps and the
+ * dedupe layer bound abuse, not this limiter alone.
  */
+async function checkPg(key: string, windowSec: number): Promise<RateResult> {
+  const db = getDb();
+  const namespaced = `rl:${key}`;
+
+  try {
+    const claimed = await db.execute<{ expires_at: Date }>(sql`
+      INSERT INTO ${schema.rateLimit} (key, expires_at)
+      VALUES (${namespaced}, NOW() + (${windowSec}::int * INTERVAL '1 second'))
+      ON CONFLICT (key) DO UPDATE
+        SET expires_at = EXCLUDED.expires_at
+        WHERE ${schema.rateLimit}.expires_at < NOW()
+      RETURNING expires_at
+    `);
+
+    if (claimed.length > 0) return { ok: true };
+
+    // Slot is held — read current expiry to compute retry-after.
+    const [row] = await db.execute<{ retry_after: number }>(sql`
+      SELECT GREATEST(1, CEIL(EXTRACT(EPOCH FROM (expires_at - NOW()))))::int
+        AS retry_after
+      FROM ${schema.rateLimit}
+      WHERE key = ${namespaced}
+    `);
+    return {
+      ok: false,
+      retryAfterSec: row?.retry_after ?? windowSec,
+    };
+  } catch (err) {
+    console.warn("[rate-limit] db failed, allowing request", err);
+    return { ok: true };
+  }
+}
+
 export async function checkRate(
   key: string,
   windowSec: number = DEFAULT_WINDOW_SEC,
 ): Promise<RateResult> {
-  const redis = getRedis();
-  if (!redis) return checkMem(key, windowSec * 1000);
-
-  const redisKey = `rl:${key}`;
-  try {
-    // INCR + EXPIRE-NX: first hit creates the counter and sets TTL,
-    // subsequent hits within the window just bump it. We block on
-    // count > 1 — equivalent to "1 request per window" semantics.
-    const count = await redis.incr(redisKey);
-    if (count === 1) {
-      await redis.expire(redisKey, windowSec);
-      return { ok: true };
-    }
-    const ttl = await redis.ttl(redisKey);
-    return {
-      ok: false,
-      retryAfterSec: ttl > 0 ? ttl : windowSec,
-    };
-  } catch (err) {
-    console.warn("[rate-limit] redis failed, allowing request", err);
-    return { ok: true };
-  }
+  if (!dbConfigured()) return checkMem(key, windowSec * 1000);
+  return checkPg(key, windowSec);
 }

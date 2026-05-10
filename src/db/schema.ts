@@ -1,4 +1,5 @@
 import {
+  bigserial,
   boolean,
   index,
   integer,
@@ -7,6 +8,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -54,3 +56,40 @@ export const cards = pgTable(
 
 export type Card = typeof cards.$inferSelect;
 export type NewCard = typeof cards.$inferInsert;
+
+// Token-bucket-style rate limit. One row per (key) — when expires_at is
+// in the past, the slot is free and the next caller upserts a new TTL.
+// Cleanup is intentionally lazy: rows with stale expires_at are
+// overwritten on contention, and the index supports a periodic
+// `DELETE WHERE expires_at < NOW()` if we ever need to reclaim space.
+export const rateLimit = pgTable(
+  "rate_limit",
+  {
+    key: text("key").primaryKey(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("rate_limit_expires_at_idx").on(t.expiresAt)],
+);
+
+// Reaction log. The composite UNIQUE enforces "one (card, ip_hash, kind)
+// can only fire once" — replaces the old in-memory VOTED Map. Keeping
+// rows forever (no TTL) gives us a permanent dedupe and a reaction log
+// we can mine for analytics later.
+export const reactions = pgTable(
+  "reactions",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    cardId: uuid("card_id").notNull(),
+    ipHash: text("ip_hash").notNull(),
+    reaction: text("reaction").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("reactions_unique_idx").on(t.cardId, t.ipHash, t.reaction),
+  ],
+);
+
+export type RateLimitRow = typeof rateLimit.$inferSelect;
+export type ReactionRow = typeof reactions.$inferSelect;

@@ -27,29 +27,19 @@ The app degrades gracefully when secrets are missing:
 | Missing env | What still works |
 |---|---|
 | `ANTHROPIC_API_KEY` | Form falls back to a local mock generator |
-| `DATABASE_URL` | Reads/writes fall back to `MOCK_CARDS`; cards live in `sessionStorage` only |
-| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | Rate limit + reaction dedupe fall back to per-instance memory (effectively off on serverless) |
+| `DATABASE_URL` | Reads/writes fall back to `MOCK_CARDS`; rate limit + reaction dedupe fall back to per-instance memory (effectively off on serverless) |
 | `IP_HASH_SALT` | A fixed dev salt is used; safe locally, set this in prod |
 | `LEMON_PREMIUM_URL` | Premium CTA shows a "coming soon" placeholder |
 | `NEXT_PUBLIC_BMC_USERNAME` | BMC widget hides itself |
 
 ## Required env vars
 
-See \`.env.local.example\`. For full functionality you need:
+See `.env.local.example`. For full functionality you need:
 - an Anthropic API key,
-- a Supabase pooled \`DATABASE_URL\`,
-- and an Upstash Redis pair (\`UPSTASH_REDIS_REST_URL\` + \`UPSTASH_REDIS_REST_TOKEN\`) plus an \`IP_HASH_SALT\` so rate limiting and reaction dedupe survive serverless cold starts.
+- a Supabase pooled `DATABASE_URL` (cards, rate-limit, reactions all live here),
+- and an `IP_HASH_SALT` (any random string — `openssl rand -hex 32`) used to hash client IPs before they're stored as rate-limit / dedupe keys.
 
-All DB / Redis access is server-side via API routes — there are no \`NEXT_PUBLIC_\` credentials.
-
-### Upstash Redis setup
-
-1. [console.upstash.com](https://console.upstash.com) → **Create Database** (any region close to your Vercel deployment).
-2. From the DB page → **REST API** → copy the \`UPSTASH_REDIS_REST_URL\` and \`UPSTASH_REDIS_REST_TOKEN\`.
-3. Generate a random salt: \`openssl rand -hex 32\` → paste as \`IP_HASH_SALT\`.
-4. Add all three to Vercel → Project Settings → Environment Variables for **Production** and **Preview**.
-
-The free tier (10k requests/day) is plenty for early-stage traffic.
+All DB access is server-side via API routes — there are no `NEXT_PUBLIC_` credentials.
 
 ## Database setup
 
@@ -62,7 +52,7 @@ The free tier (10k requests/day) is plenty for early-stage traffic.
    npm run db:migrate
    ```
 
-   This runs `drizzle/0000_init.sql` against the database — creates the `color_theme` enum, the `cards` table, and indexes on `created_at desc` + `is_public`.
+   This runs every file under `drizzle/*.sql` in order — creates the `color_theme` enum, the `cards` table (+ reactions, lineage, rate-limit columns/tables added by later migrations).
 5. Smoke test:
 
    ```bash
@@ -80,6 +70,7 @@ The free tier (10k requests/day) is plenty for early-stage traffic.
    - `NEXT_PUBLIC_SITE_URL` — your production domain (e.g. `https://bragme.app`)
    - `ANTHROPIC_API_KEY`
    - `DATABASE_URL` — Supabase pooled connection (port 6543)
+   - `IP_HASH_SALT` — random 64-hex string (`openssl rand -hex 32`)
    - `LEMON_PREMIUM_URL`, `LEMON_WEBHOOK_SECRET` (when ready)
    - `NEXT_PUBLIC_MONETAG_ZONE_ID`, `NEXT_PUBLIC_BMC_USERNAME` (optional)
 5. After the first deploy: wire the Lemon Squeezy webhook to `https://<your-domain>/api/lemon/webhook` with `LEMON_WEBHOOK_SECRET` as the signing secret.

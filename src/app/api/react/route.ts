@@ -1,24 +1,62 @@
+import { sql } from "drizzle-orm";
 import { bumpReaction, getCardById } from "@/lib/cards-store";
 import { isReaction, type Reaction } from "@/components/card/Card";
 import { clientFingerprint } from "@/lib/client-ip";
-import { getRedis } from "@/lib/redis";
+import { getDb, schema } from "@/db/client";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const WINDOW_SEC = 24 * 60 * 60;
-
-// In-memory dedupe — only used when Upstash isn't configured (local dev).
-// On serverless this Map doesn't survive cold starts, so prod must set
-// UPSTASH_REDIS_REST_URL/TOKEN.
+// ---------- in-memory fallback (dev only) ----------
+//
+// On serverless this Map doesn't survive cold starts, so prod must have
+// DATABASE_URL set. Kept only so the route still works in mock-only dev
+// environments (matches the cards-store.ts pattern).
 const memVoted = new Map<string, number>();
+const MEM_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function alreadyReactedMem(key: string) {
   const now = Date.now();
   const ts = memVoted.get(key);
-  if (ts && now - ts < WINDOW_SEC * 1000) return true;
+  if (ts && now - ts < MEM_WINDOW_MS) return true;
   memVoted.set(key, now);
   return false;
+}
+
+// ---------- Postgres path ----------
+
+function dbConfigured(): boolean {
+  return Boolean(process.env.DATABASE_URL);
+}
+
+/**
+ * Insert into reactions; UNIQUE(card_id, ip_hash, reaction) enforces
+ * "one reaction per (card, fingerprint, kind), forever". Returns true
+ * when the row already existed (i.e. the user already reacted).
+ *
+ * Fail-open on DB error: if the insert blows up for non-unique reasons
+ * we let the reaction through rather than blocking the user. The
+ * cards.cheers_count update is the source of truth for the visible
+ * counter; this row is just the dedupe ledger.
+ */
+async function alreadyReactedPg(
+  fingerprint: string,
+  cardId: string,
+  reaction: Reaction,
+): Promise<boolean> {
+  const db = getDb();
+  try {
+    const inserted = await db.execute<{ id: number }>(sql`
+      INSERT INTO ${schema.reactions} (card_id, ip_hash, reaction)
+      VALUES (${cardId}::uuid, ${fingerprint}, ${reaction})
+      ON CONFLICT (card_id, ip_hash, reaction) DO NOTHING
+      RETURNING id
+    `);
+    return inserted.length === 0;
+  } catch (err) {
+    console.warn("[react] db dedupe failed, allowing", err);
+    return false;
+  }
 }
 
 async function alreadyReacted(
@@ -26,19 +64,10 @@ async function alreadyReacted(
   cardId: string,
   reaction: Reaction,
 ): Promise<boolean> {
-  const key = `react:${fingerprint}:${cardId}:${reaction}`;
-  const redis = getRedis();
-  if (!redis) return alreadyReactedMem(key);
-
-  try {
-    // SET NX EX: atomic "claim this slot for 24h or report it's taken".
-    // Returns "OK" on success, null if the key already existed.
-    const claimed = await redis.set(key, "1", { nx: true, ex: WINDOW_SEC });
-    return claimed === null;
-  } catch (err) {
-    console.warn("[react] redis dedupe failed, allowing", err);
-    return false;
+  if (!dbConfigured()) {
+    return alreadyReactedMem(`${fingerprint}::${cardId}::${reaction}`);
   }
+  return alreadyReactedPg(fingerprint, cardId, reaction);
 }
 
 function fail(code: string, message: string, status: number) {
