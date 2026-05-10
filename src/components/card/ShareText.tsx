@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { CardData } from "./Card";
+import { bumpShareCount } from "@/lib/share-tracking";
 
 type Props = {
   data: CardData;
@@ -44,6 +45,7 @@ function Snippet({ label, body }: { label: string; body: string }) {
     try {
       await navigator.clipboard.writeText(body);
       setCopied(true);
+      bumpShareCount();
       setTimeout(() => setCopied(false), 1500);
     } catch {
       // Clipboard is best-effort; fail silently if denied.

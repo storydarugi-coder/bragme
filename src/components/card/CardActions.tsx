@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toPng } from "html-to-image";
 import type { CardData, CardVariant } from "./Card";
+import { bumpShareCount } from "@/lib/share-tracking";
 
 type Props = {
   data: CardData;
@@ -80,8 +81,10 @@ export function CardActions({ data, targetSelector, variants }: Props) {
           text: data.vibeCaption,
           url,
         });
+        bumpShareCount();
       } else {
         await navigator.clipboard.writeText(url);
+        bumpShareCount();
         setError("Link copied to clipboard");
       }
     } catch (err) {

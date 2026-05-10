@@ -239,7 +239,10 @@ function DefaultLayout({
           <span className="font-mono text-[10px] uppercase tracking-[0.28em] opacity-80">
             BragMe
           </span>
-          <span className="text-3xl leading-none" aria-hidden>
+          <span
+            className="text-3xl leading-none transition-transform duration-500 group-hover:scale-125 group-hover:-rotate-12"
+            aria-hidden
+          >
             {data.emoji}
           </span>
         </header>

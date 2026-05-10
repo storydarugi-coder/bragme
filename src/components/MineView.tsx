@@ -5,11 +5,12 @@ import { useEffect, useState } from "react";
 import { FeedCard } from "./FeedCard";
 import type { CardData } from "./card/Card";
 import { listCreatedIds, loadCard } from "@/lib/card-storage";
+import { loadShareCount } from "@/lib/share-tracking";
 
 type State =
   | { kind: "loading" }
   | { kind: "empty" }
-  | { kind: "ready"; cards: CardData[] };
+  | { kind: "ready"; cards: CardData[]; shareCount: number };
 
 export function MineView() {
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -17,12 +18,19 @@ export function MineView() {
   useEffect(() => {
     const ids = listCreatedIds();
     const cards: CardData[] = [];
-    // Walk newest-first — markCreated appends, so reverse the list.
     for (let i = ids.length - 1; i >= 0; i--) {
       const card = loadCard(ids[i]);
       if (card) cards.push(card);
     }
-    setState(cards.length ? { kind: "ready", cards } : { kind: "empty" });
+    if (cards.length === 0) {
+      setState({ kind: "empty" });
+    } else {
+      setState({
+        kind: "ready",
+        cards,
+        shareCount: loadShareCount(),
+      });
+    }
   }, []);
 
   if (state.kind === "loading") {
@@ -50,10 +58,45 @@ export function MineView() {
   }
 
   return (
-    <div className="columns-1 gap-6 sm:columns-2 lg:columns-3">
-      {state.cards.map((card) => (
-        <FeedCard key={card.id} data={card} />
-      ))}
+    <div className="space-y-6">
+      <SessionStats
+        cardCount={state.cards.length}
+        shareCount={state.shareCount}
+      />
+      <div className="columns-1 gap-6 sm:columns-2 lg:columns-3">
+        {state.cards.map((card) => (
+          <FeedCard key={card.id} data={card} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SessionStats({
+  cardCount,
+  shareCount,
+}: {
+  cardCount: number;
+  shareCount: number;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+      <div className="rounded-2xl border border-foreground/10 bg-foreground/5 px-4 py-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          cards spilled
+        </p>
+        <p className="mt-1 text-2xl font-semibold tabular-nums">
+          {cardCount.toLocaleString()}
+        </p>
+      </div>
+      <div className="rounded-2xl border border-foreground/10 bg-foreground/5 px-4 py-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          shares cast
+        </p>
+        <p className="mt-1 text-2xl font-semibold tabular-nums">
+          {shareCount.toLocaleString()}
+        </p>
+      </div>
     </div>
   );
 }
