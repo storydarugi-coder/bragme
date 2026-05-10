@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { FeedCard } from "./FeedCard";
 import type { CardData } from "./card/Card";
 import { listCreatedIds, loadCard } from "@/lib/card-storage";
+import { clearUnread } from "@/lib/notification-store";
 import { loadShareCount } from "@/lib/share-tracking";
 
 type State =
@@ -16,6 +17,9 @@ export function MineView() {
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
+    // Visiting /mine acknowledges any pending notifications.
+    clearUnread();
+
     const ids = listCreatedIds();
     const cards: CardData[] = [];
     for (let i = ids.length - 1; i >= 0; i--) {

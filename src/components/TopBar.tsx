@@ -2,10 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ThemeToggle } from "./ThemeToggle";
+import {
+  loadUnreadCount,
+  NOTIFICATION_CHANGE_EVENT,
+} from "@/lib/notification-store";
 
 export function TopBar() {
   const pathname = usePathname();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    function update() {
+      setUnread(loadUnreadCount());
+    }
+    update();
+    window.addEventListener(NOTIFICATION_CHANGE_EVENT, update);
+    return () =>
+      window.removeEventListener(NOTIFICATION_CHANGE_EVENT, update);
+  }, []);
+
   if (pathname?.startsWith("/embed")) return null;
 
   return (
@@ -32,9 +49,15 @@ export function TopBar() {
           </Link>
           <Link
             href="/mine"
-            className="rounded-full px-3 py-1.5 hover:bg-foreground/5"
+            className="relative rounded-full px-3 py-1.5 hover:bg-foreground/5"
           >
             Mine
+            {unread > 0 && (
+              <span
+                aria-label={`${unread} unread`}
+                className="absolute right-1 top-1 inline-block h-2 w-2 rounded-full bg-rose-500"
+              />
+            )}
           </Link>
           <ThemeToggle />
         </nav>

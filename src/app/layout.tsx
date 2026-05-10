@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { TopBar } from "@/components/TopBar";
 import { Footer } from "@/components/Footer";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
+import { NotificationPoller } from "@/components/NotificationPoller";
+import { NotificationToast } from "@/components/NotificationToast";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -72,6 +74,8 @@ export default function RootLayout({
         {children}
         <Footer />
         <KeyboardShortcuts />
+        <NotificationPoller />
+        <NotificationToast />
       </body>
     </html>
   );
