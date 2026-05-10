@@ -51,6 +51,7 @@ export const cards = pgTable(
     index("cards_created_at_idx").on(t.createdAt.desc()),
     index("cards_is_public_idx").on(t.isPublic),
     index("cards_parent_id_idx").on(t.parentId),
+    uniqueIndex("cards_nickname_unique_idx").on(t.nickname),
   ],
 );
 

@@ -3,6 +3,7 @@ import { getDb, schema } from "@/db/client";
 import type { CardData } from "@/components/card/Card";
 import type { ColorTheme } from "@/db/schema";
 import { MOCK_CARDS, getMockCardById } from "@/lib/mock";
+import { generateHandle } from "@/lib/handle";
 
 /**
  * Single source of truth for card reads/writes. Falls back to MOCK_CARDS
@@ -293,20 +294,57 @@ export type InsertCardInput = {
   relationType?: string | null;
 };
 
+// Postgres "unique_violation" — see https://www.postgresql.org/docs/current/errcodes-appendix.html
+const PG_UNIQUE_VIOLATION = "23505";
+
+function isNicknameCollision(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: unknown; constraint_name?: unknown; constraint?: unknown };
+  if (e.code !== PG_UNIQUE_VIOLATION) return false;
+  // postgres.js exposes the violated constraint as `constraint_name`; some
+  // wrappers use `constraint`. Either way, only the nickname index should
+  // ever collide here, so a 23505 is almost certainly the handle.
+  const c = (e.constraint_name ?? e.constraint) as string | undefined;
+  return c === undefined || c === "cards_nickname_unique_idx";
+}
+
 export async function insertCard(
   input: InsertCardInput,
 ): Promise<CardData | null> {
   if (!dbConfigured()) return null;
   const db = getDb();
-  const [row] = await db
-    .insert(schema.cards)
-    .values({
-      ...input,
-      parentId: input.parentId ?? null,
-      relationType: input.relationType ?? null,
-    })
-    .returning();
-  return row ? toCardData(row) : null;
+
+  // Handles are random picks from a ~1M space, so collisions become
+  // statistically meaningful past a few thousand cards. Retry up to
+  // a few times with a freshly-generated handle before giving up. The
+  // unique constraint on `nickname` is what makes the retry necessary
+  // and what makes it correct — without it we'd silently mint duplicates.
+  let nickname = input.nickname;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const [row] = await db
+        .insert(schema.cards)
+        .values({
+          ...input,
+          nickname,
+          parentId: input.parentId ?? null,
+          relationType: input.relationType ?? null,
+        })
+        .returning();
+      return row ? toCardData(row) : null;
+    } catch (err) {
+      if (isNicknameCollision(err) && attempt < 4) {
+        nickname = generateHandle();
+        continue;
+      }
+      throw err;
+    }
+  }
+  // Astronomically unlikely — 5 collisions in a row implies the table
+  // is so saturated the handle space itself needs widening.
+  throw new Error(
+    "Could not generate a unique nickname after 5 attempts; consider widening the handle space.",
+  );
 }
 
 /** Lineage = parent + siblings + children. Used by /card/[id] to show
